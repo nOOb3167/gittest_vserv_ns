@@ -3,13 +3,14 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
 PROJECT (vserv_ns)
 
 LIST(APPEND CMAKE_MODULE_PATH
-  ${CMAKE_SOURCE_DIR}/cmake/Modules
+	${CMAKE_SOURCE_DIR}/cmake/Modules
 )
 
 SET(VSERV_NS_HEADERS
+	include/vserv/ns_vserv_helpers.h
 )
 SET(VSERV_NS_SOURCES
-  src/ns_vserv_net_main.cpp
+	src/ns_vserv_net_main.cpp
 )
 
 FIND_PACKAGE(ENet REQUIRED)
