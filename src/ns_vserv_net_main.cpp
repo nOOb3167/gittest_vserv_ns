@@ -398,6 +398,15 @@ void VServWork::funcThread()
 	}
 }
 
+VServRespondWork::VServRespondWork(const std::shared_ptr<std::deque<VServWork::Write> > & writequeue) :
+	m_writequeue(writequeue)
+{}
+
+void VServRespondWork::virtualRespond(NetworkPacket packet, Address *addr_vec, size_t addr_num)
+{
+	m_writequeue->push_back(VServWork::Write(std::move(packet), addr_vec, addr_num));
+}
+
 VServMgmt::VServMgmt(size_t port) :
 	m_addr{ ENET_HOST_ANY, (uint16_t)port },
 	m_host(enet_host_create(&m_addr, VSERV_MGMT_CLIENT_MAX, 1, 0, 0), deleteENetHost),

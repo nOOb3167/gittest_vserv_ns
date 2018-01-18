@@ -112,15 +112,10 @@ private:
 class VServRespondWork : public VServRespond
 {
 public:
-	VServRespondWork(const std::shared_ptr<std::deque<VServWork::Write> > & writequeue) :
-		m_writequeue(writequeue)
-	{}
+	VServRespondWork(const std::shared_ptr<std::deque<VServWork::Write> > & writequeue);
 
 protected:
-	void virtualRespond(NetworkPacket packet, Address *addr_vec, size_t addr_num)
-	{
-		m_writequeue->push_back(VServWork::Write(std::move(packet), addr_vec, addr_num));
-	}
+	void virtualRespond(NetworkPacket packet, Address *addr_vec, size_t addr_num);
 
 private:
 	std::shared_ptr<std::deque<VServWork::Write> > m_writequeue;
