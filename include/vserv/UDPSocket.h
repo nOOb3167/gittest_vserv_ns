@@ -50,7 +50,7 @@ struct address_less_t {
 	{
 		bool n0 = a.m_family < b.m_family;
 		bool n1 = a.m_port < b.m_port;
-		bool n2cmp = memcmp(a.m_addr, b.m_addr, VSERV_ADDRESS_ADDR_SIZE);
+		int  n2cmp = memcmp(a.m_addr, b.m_addr, VSERV_ADDRESS_ADDR_SIZE);
 		bool n2 = n2cmp < 0;
 		return a.m_family != b.m_family ? n0 : (a.m_port != b.m_port ? n1 : (n2cmp != 0 ? n2 : false));
 	}
