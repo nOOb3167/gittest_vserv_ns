@@ -134,8 +134,6 @@ class VServMgmt
 public:
 	VServMgmt(size_t port);
 
-	std::map<Address, ENetPeer *, address_less_t> & getAddrPeerMap();
-
 	void funcThread();
 
 	static ENetEvent * createEmptyENetEvent();
@@ -151,7 +149,7 @@ private:
 	unique_ptr_enethost m_host;
 	std::unique_ptr<std::thread> m_thread;
 
-	std::map<Address, ENetPeer *, address_less_t> m_addr_peer_map;
+	std::shared_ptr<std::map<Address, ENetPeer *, address_less_t> > m_addr_peer_map;
 };
 
 class VServRespondMgmt : public VServRespond
@@ -159,7 +157,7 @@ class VServRespondMgmt : public VServRespond
 	typedef ::std::unique_ptr<ENetPacket, void(*)(ENetPacket *pkt)> unique_ptr_enetpacket;
 
 public:
-	VServRespondMgmt(VServMgmt *mgmt, ENetPeer *peer);
+	VServRespondMgmt(const std::shared_ptr<std::map<Address, ENetPeer *, address_less_t> > &addr_peer_map);
 
 	static void deleteENetPacket(ENetPacket *pkt);
 
@@ -167,8 +165,7 @@ protected:
 	void virtualRespond(NetworkPacket packet, Address *addr_vec, size_t addr_num);
 
 private:
-	VServMgmt * m_mgmt;
-	ENetPeer *  m_peer;
+	std::shared_ptr<std::map<Address, ENetPeer *, address_less_t> > m_addr_peer_map;
 };
 
 class VServCtl

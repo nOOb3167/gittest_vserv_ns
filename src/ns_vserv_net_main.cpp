@@ -303,9 +303,8 @@ void VServRespond::respondOneshot(NetworkPacket packet, Address addr)
 	virtualRespond(std::move(packet), &addr, 1);
 }
 
-VServRespondMgmt::VServRespondMgmt(VServMgmt *mgmt, ENetPeer *peer) :
-	m_mgmt(mgmt),
-	m_peer(peer)
+VServRespondMgmt::VServRespondMgmt(const std::shared_ptr<std::map<Address, ENetPeer *, address_less_t> > &addr_peer_map) :
+	m_addr_peer_map(addr_peer_map)
 {}
 
 void VServRespondMgmt::deleteENetPacket(ENetPacket *pkt)
@@ -332,8 +331,8 @@ void VServRespondMgmt::virtualRespond(NetworkPacket packet, Address *addr_vec, s
 		throw std::runtime_error("respond mgmt packet");
 
 	for (size_t write_num = 0; write_num < addr_num; write_num++) {
-		auto itPeer = m_mgmt->getAddrPeerMap().find(addr_vec[write_num]);
-		if (itPeer == m_mgmt->getAddrPeerMap().end())
+		auto itPeer = m_addr_peer_map->find(addr_vec[write_num]);
+		if (itPeer == m_addr_peer_map->end())
 			throw std::runtime_error("respond mgmt peer find");
 		if (!!enet_peer_send(itPeer->second, 0, pkt_dummy))
 			throw std::runtime_error("respond mgmt peer send");
@@ -355,7 +354,7 @@ VServWork::VServWork(size_t port) :
 	m_addr(AF_INET, port, 0, address_ipv4_tag_t()),
 	m_sock(new UDPSocket()),
 	m_thread(),
-	m_writequeue()
+	m_writequeue(new std::deque<VServWork::Write>())
 {
 	m_sock->Bind(m_addr);
 	m_thread.reset(new std::thread(&VServWork::funcThread, this));
@@ -402,16 +401,12 @@ void VServWork::funcThread()
 VServMgmt::VServMgmt(size_t port) :
 	m_addr{ ENET_HOST_ANY, (uint16_t)port },
 	m_host(enet_host_create(&m_addr, VSERV_MGMT_CLIENT_MAX, 1, 0, 0), deleteENetHost),
-	m_thread()
+	m_thread(),
+	m_addr_peer_map(new std::map<Address, ENetPeer *, address_less_t>())
 {
 	if (!m_host)
 		throw std::runtime_error("enet host create");
 	m_thread.reset(new std::thread(&VServMgmt::funcThread, this));
-}
-
-std::map<Address, ENetPeer *, address_less_t> & VServMgmt::getAddrPeerMap()
-{
-	return m_addr_peer_map;
 }
 
 void VServMgmt::funcThread()
@@ -445,7 +440,7 @@ void VServMgmt::funcThread()
 		{
 			Address addr = vserv_enetaddress_to_address(evt->peer->address);
 
-			if (!(m_addr_peer_map.insert(std::make_pair(addr, evt->peer))).second)
+			if (!(m_addr_peer_map->insert(std::make_pair(addr, evt->peer))).second)
 				throw std::runtime_error("addr peer map insert");
 		}
 		break;
@@ -453,9 +448,9 @@ void VServMgmt::funcThread()
 		case ENET_EVENT_TYPE_DISCONNECT:
 		{
 			Address addr = vserv_enetaddress_to_address(evt->peer->address);
-			auto it = m_addr_peer_map.find(addr);
-			assert(it != m_addr_peer_map.end());
-			m_addr_peer_map.erase(it);
+			auto it = m_addr_peer_map->find(addr);
+			assert(it != m_addr_peer_map->end());
+			m_addr_peer_map->erase(it);
 		}
 		break;
 
@@ -463,7 +458,7 @@ void VServMgmt::funcThread()
 		{
 			Address addr = vserv_enetaddress_to_address(evt->peer->address);
 			NetworkPacket packet(evt->packet->data, evt->packet->dataLength, networkpacket_buf_len_tag_t());
-			VServRespondMgmt respond(this, evt->peer);
+			VServRespondMgmt respond(m_addr_peer_map);
 
 			virtualProcessPacket(&packet, &respond, addr);
 		}
