@@ -8,6 +8,7 @@ LIST(APPEND CMAKE_MODULE_PATH
 
 SET(VSERV_NS_HEADERS
 	include/vserv/ns_vserv_helpers.h
+	include/vserv/UDPSocket.h
 )
 SET(VSERV_NS_SOURCES
 	src/ns_vserv_net_main.cpp

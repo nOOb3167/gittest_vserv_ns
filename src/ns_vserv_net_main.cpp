@@ -17,39 +17,18 @@
 #include <enet/enet.h>
 
 #include <vserv/ns_vserv_helpers.h>
+#include <vserv/UDPSocket.h>
 
 #define MYMIN(a, b) ((a) < (b) ? (a) : (b))
 
 #define GS_DUMMY(...) do {} while(0)
 
-#define VSERV_ADDRESS_ADDR_SIZE 16
 #define VSERV_NETWORKPACKET_SIZE_INCREMENT 4096
 
 #define VSERV_MGMT_CLIENT_MAX 128
 
-struct address_ipv4_tag_t {};
 struct networkpacket_buf_len_tag_t {};
 struct networkpacket_cmd_tag_t {};
-
-class Address
-{
-public:
-	Address(uint8_t family, uint16_t port, uint32_t addr, address_ipv4_tag_t) :
-		m_family(family),
-		m_port(port),
-		m_addr()
-	{
-		memset(m_addr, '\0', VSERV_ADDRESS_ADDR_SIZE);
-		memcpy(m_addr, &addr, sizeof (uint32_t));
-	}
-
-private:
-	uint8_t  m_family;
-	uint16_t m_port;
-	uint8_t  m_addr[VSERV_ADDRESS_ADDR_SIZE];
-
-	friend struct address_less_t;
-};
 
 class NetworkPacket
 {
@@ -187,22 +166,6 @@ private:
 	std::vector<uint8_t> m_data;
 	size_t m_off;
 };
-
-struct address_less_t {
-	bool operator()(const Address &a, const Address &b) const
-	{
-		bool n0 = a.m_family < b.m_family;
-		bool n1 = a.m_port < b.m_port;
-		bool n2cmp = memcmp(a.m_addr, b.m_addr, VSERV_ADDRESS_ADDR_SIZE);
-		bool n2 = n2cmp < 0;
-		return a.m_family != b.m_family ? n0 : (a.m_port != b.m_port ? n1 : (n2cmp != 0 ? n2 : false));
-	}
-};
-
-Address vserv_enetaddress_to_address(ENetAddress enet_addr)
-{
-	return Address(AF_INET, enet_addr.port, ntohl(enet_addr.host), address_ipv4_tag_t());
-}
 
 class VServRespond
 {
