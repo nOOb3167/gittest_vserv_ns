@@ -80,40 +80,6 @@ protected:
 	virtual void virtualRespond(NetworkPacket packet, Address *addr_vec, size_t addr_num) = 0;
 };
 
-class VServRespondMgmt : public VServRespond
-{
-	typedef ::std::unique_ptr<ENetPacket, void(*)(ENetPacket *pkt)> unique_ptr_enetpacket;
-
-public:
-	VServRespondMgmt(VServMgmt *mgmt, ENetPeer *peer);
-
-	static void deleteENetPacket(ENetPacket *pkt);
-
-protected:
-	void virtualRespond(NetworkPacket packet, Address *addr_vec, size_t addr_num);
-
-private:
-	VServMgmt * m_mgmt;
-	ENetPeer *  m_peer;
-};
-
-class VServRespondWork : public VServRespond
-{
-public:
-	VServRespondWork(const std::shared_ptr<std::deque<VServWork::Write> > & writequeue) :
-		m_writequeue(writequeue)
-	{}
-
-protected:
-	void virtualRespond(NetworkPacket packet, Address *addr_vec, size_t addr_num)
-	{
-		m_writequeue->push_back(VServWork::Write(std::move(packet), addr_vec, addr_num));
-	}
-
-private:
-	std::shared_ptr<std::deque<VServWork::Write> > m_writequeue;
-};
-
 class VServWork
 {
 public:
@@ -143,6 +109,23 @@ private:
 	std::shared_ptr<std::deque<VServWork::Write> > m_writequeue;
 };
 
+class VServRespondWork : public VServRespond
+{
+public:
+	VServRespondWork(const std::shared_ptr<std::deque<VServWork::Write> > & writequeue) :
+		m_writequeue(writequeue)
+	{}
+
+protected:
+	void virtualRespond(NetworkPacket packet, Address *addr_vec, size_t addr_num)
+	{
+		m_writequeue->push_back(VServWork::Write(std::move(packet), addr_vec, addr_num));
+	}
+
+private:
+	std::shared_ptr<std::deque<VServWork::Write> > m_writequeue;
+};
+
 class VServMgmt
 {
 	typedef ::std::unique_ptr<ENetHost, void(*)(ENetHost *host)> unique_ptr_enethost;
@@ -169,6 +152,23 @@ private:
 	std::unique_ptr<std::thread> m_thread;
 
 	std::map<Address, ENetPeer *, address_less_t> m_addr_peer_map;
+};
+
+class VServRespondMgmt : public VServRespond
+{
+	typedef ::std::unique_ptr<ENetPacket, void(*)(ENetPacket *pkt)> unique_ptr_enetpacket;
+
+public:
+	VServRespondMgmt(VServMgmt *mgmt, ENetPeer *peer);
+
+	static void deleteENetPacket(ENetPacket *pkt);
+
+protected:
+	void virtualRespond(NetworkPacket packet, Address *addr_vec, size_t addr_num);
+
+private:
+	VServMgmt * m_mgmt;
+	ENetPeer *  m_peer;
 };
 
 class VServCtl

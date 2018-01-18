@@ -348,7 +348,7 @@ VServWork::Write::Write(NetworkPacket packet, Address *addr_vec, size_t addr_num
 	m_addr_idx(0)
 {
 	assert(addr_num <= m_addr.size());
-	std::copy(addr_vec, addr_vec + addr_num, m_addr);
+	std::copy(addr_vec, addr_vec + addr_num, m_addr.begin());
 }
 
 VServWork::VServWork(size_t port) :
