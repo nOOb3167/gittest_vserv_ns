@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -99,10 +100,6 @@ public:
 	std::shared_ptr<VServGroupAll> m_groupall;
 };
 
-class VServWork
-{
-
-};
 
 class VServMgmt0 : public VServMgmt
 {
@@ -341,6 +338,64 @@ void VServRespondMgmt::virtualRespond(NetworkPacket packet, Address *addr_vec, s
 		if (!!enet_peer_send(itPeer->second, 0, pkt_dummy))
 			throw std::runtime_error("respond mgmt peer send");
 		pkt.release();
+	}
+}
+
+VServWork::Write::Write(NetworkPacket packet, Address *addr_vec, size_t addr_num) :
+	m_packet(std::move(packet)),
+	m_addr(),
+	m_addr_num(addr_num),
+	m_addr_idx(0)
+{
+	assert(addr_num <= m_addr.size());
+	std::copy(addr_vec, addr_vec + addr_num, m_addr);
+}
+
+VServWork::VServWork(size_t port) :
+	m_addr(AF_INET, port, 0, address_ipv4_tag_t()),
+	m_sock(new UDPSocket()),
+	m_thread(),
+	m_writequeue()
+{
+	m_sock->Bind(m_addr);
+	m_thread.reset(new std::thread(&VServWork::funcThread, this));
+}
+
+void VServWork::funcThread()
+{
+	const size_t timeout_generation_max = 4; /* [0,4] interval */
+	uint32_t timeout_generation_vec[] = { 1,  5,  10, 20,  500 };
+	uint32_t timeout_generation_cnt_vec[] = { 10, 10, 10, 100, 0xFFFFFFFF };
+
+	size_t timeout_generation = 0;
+	size_t timeout_generation_cnt = 0;
+
+	while (true) {
+		Address addr;
+		uint8_t data[VSERV_UDPSIZE_MAX] = {};
+
+		while (!m_writequeue->empty()) {
+			Write & write = m_writequeue->front();
+			size_t i = write.m_addr_idx;
+			for (/*dummy*/; i < write.m_addr_num; i++)
+				m_sock->Send(write.m_addr[i], write.m_packet.getDataPtr(), write.m_packet.getDataSize());
+			if (i == write.m_addr_num)
+				m_writequeue->pop_front();
+		}
+
+		int rcvt = m_sock->ReceiveWaiting(&addr, data, VSERV_UDPSIZE_MAX, timeout_generation_vec[timeout_generation]);
+
+		/* timeout - if too many, switch to next timeout generation */
+		if (rcvt == -1) {
+			if ((++timeout_generation_cnt % timeout_generation_cnt_vec[timeout_generation]) == 0)
+				timeout_generation = MYMIN(timeout_generation + 1, timeout_generation_max);
+			continue;
+		}
+
+		NetworkPacket packet(data, rcvt, networkpacket_buf_len_tag_t());
+		VServRespondWork respond(m_writequeue);
+
+		virtualProcessPacket(&packet, &respond, addr);
 	}
 }
 

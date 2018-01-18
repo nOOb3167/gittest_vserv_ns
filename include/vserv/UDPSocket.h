@@ -15,6 +15,15 @@ struct address_ipv4_tag_t {};
 class Address
 {
 public:
+	Address() :
+		m_family(AF_UNSPEC),
+		m_port(0),
+		m_addr()
+	{
+		memset(m_addr, '\0', VSERV_ADDRESS_ADDR_SIZE);
+	}
+
+
 	Address(int family, uint16_t port, uint32_t addr, address_ipv4_tag_t) :
 		m_family(family),
 		m_port(port),
@@ -58,8 +67,7 @@ class UDPSocket
 
 public:
 	UDPSocket() :
-		m_handle(new int(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)), deleteFd),
-		m_timeout_ms(0)
+		m_handle(new int(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)), deleteFd)
 	{
 		if (*m_handle < 0)
 			throw std::runtime_error("UDPSocket socket");
@@ -97,9 +105,9 @@ public:
 			throw std::runtime_error("UDPSocket send sent");
 	}
 
-	int Receive(Address *sender, void *data, int size)
+	int ReceiveWaiting(Address *sender, void *data, int size, int timeout_ms)
 	{
-		if (! WaitData(m_timeout_ms))
+		if (! WaitData(timeout_ms))
 			return -1;
 
 		struct sockaddr_in sockaddr = {};
@@ -158,7 +166,6 @@ public:
 
 private:
 	unique_ptr_fd m_handle;
-	int m_timeout_ms;
 };
 
 #endif /* _UDPSOCKET_H_ */

@@ -1,9 +1,13 @@
 #ifndef _NS_VSERV_NET_MAIN_H_
 #define _NS_VSERV_NET_MAIN_H_
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <thread>
+#include <utility>
 #include <vector>
 
 #include <enet/enet.h>
@@ -15,7 +19,9 @@
 #define GS_DUMMY(...) do {} while(0)
 
 #define VSERV_NETWORKPACKET_SIZE_INCREMENT 4096
+#define VSERV_UDPSIZE_MAX 4096
 
+#define VSERV_WORK_CLIENT_MAX 128
 #define VSERV_MGMT_CLIENT_MAX 128
 
 class VServMgmt;
@@ -89,6 +95,52 @@ protected:
 private:
 	VServMgmt * m_mgmt;
 	ENetPeer *  m_peer;
+};
+
+class VServRespondWork : public VServRespond
+{
+public:
+	VServRespondWork(const std::shared_ptr<std::deque<VServWork::Write> > & writequeue) :
+		m_writequeue(writequeue)
+	{}
+
+protected:
+	void virtualRespond(NetworkPacket packet, Address *addr_vec, size_t addr_num)
+	{
+		m_writequeue->push_back(VServWork::Write(std::move(packet), addr_vec, addr_num));
+	}
+
+private:
+	std::shared_ptr<std::deque<VServWork::Write> > m_writequeue;
+};
+
+class VServWork
+{
+public:
+	class Write
+	{
+	public:
+		Write(NetworkPacket packet, Address *addr_vec, size_t addr_num);
+
+		NetworkPacket m_packet;
+		std::array<Address, VSERV_WORK_CLIENT_MAX> m_addr;
+		size_t m_addr_num;
+		size_t m_addr_idx;
+	};
+
+	VServWork(size_t port);
+
+	void funcThread();
+
+protected:
+	virtual void virtualProcessPacket(NetworkPacket *packet, VServRespond *respond, Address addr) = 0;
+
+private:
+	Address m_addr;
+	std::unique_ptr<UDPSocket>   m_sock;
+	std::unique_ptr<std::thread> m_thread;
+
+	std::shared_ptr<std::deque<VServWork::Write> > m_writequeue;
 };
 
 class VServMgmt
