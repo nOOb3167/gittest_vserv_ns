@@ -50,6 +50,8 @@ public:
 	NetworkPacket(NetworkPacket &&a)            = default;
 	NetworkPacket& operator=(NetworkPacket &&a) = default;
 
+	NetworkPacket copyReset();
+
 	uint8_t * getDataPtr();
 	size_t getDataSize();
 	size_t getRemainingSize();

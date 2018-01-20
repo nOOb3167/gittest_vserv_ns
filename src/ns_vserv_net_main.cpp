@@ -231,7 +231,10 @@ public:
 
 		std::unique_lock<std::mutex> lock(m_ext->m_mutex);
 
+		std::shared_ptr<VServUser> user = identifyProcess(packet, respond, addr);
+
 		long long timestamp = vserv_timestamp();
+		bool haveAnyTimeout = timeoutRecv(timestamp, user.get());
 
 		uint8_t id;
 
@@ -241,9 +244,7 @@ public:
 			if (id == cmd_num_name[i].mNum)
 				GS_DUMMY();
 
-		std::shared_ptr<VServUser> user = identifyProcess(packet, respond, addr);
-
-		bool haveAnyTimeout = timeoutRecv(timestamp, user.get());
+		GS_DUMMY();
 
 		switch (id)
 		{
@@ -342,16 +343,16 @@ public:
 			}
 			break;
 
-			case GS_VSERV_CMD_PING:
-			{
-				/* currently no processing */
-			}
-			break;
-
 			default:
 				throw ProtocolExc("unknown mode");
 			}
 
+		}
+		break;
+
+		case GS_VSERV_CMD_PING:
+		{
+			/* currently no processing */
 		}
 		break;
 
@@ -373,7 +374,7 @@ public:
 
 		/* missing - must be ident. create new. */
 		uint32_t user_rand = 0;
-		std::shared_ptr<VServUser> new_user = identifyParseIdent(packet, &user_rand);
+		std::shared_ptr<VServUser> new_user = identifyParseIdent(std::move(packet->copyReset()), &user_rand);
 		/* acknowledge new */
 		NetworkPacket packet_out(GS_VSERV_CMD_IDENT_ACK, networkpacket_cmd_tag_t());
 		packet_out << user_rand << new_user->m_id->m_id;
@@ -387,7 +388,7 @@ public:
 		return new_user;
 	}
 
-	std::shared_ptr<VServUser> identifyParseIdent(NetworkPacket *packet, uint32_t *o_user_rand)
+	std::shared_ptr<VServUser> identifyParseIdent(NetworkPacket packet, uint32_t *o_user_rand)
 	{
 		std::shared_ptr<VServUser> new_user;
 
@@ -396,13 +397,16 @@ public:
 		uint32_t name_len;
 		uint32_t serv_len;
 
-		(*packet) >> cmd >> user_rand >> name_len >> serv_len;
+		packet >> cmd >> user_rand >> name_len >> serv_len;
 
 		if (cmd != GS_VSERV_CMD_IDENT)
 			throw ProtocolExc("not cmd ident");
 
-		std::string name(packet->inSizedStr(name_len), name_len);
-		std::string serv(packet->inSizedStr(serv_len), serv_len);
+		std::string name(packet.inSizedStr(name_len), name_len);
+		std::string serv(packet.inSizedStr(serv_len), serv_len);
+
+		if (o_user_rand)
+			*o_user_rand = user_rand;
 
 		return std::shared_ptr<VServUser>(new VServUser(std::move(name), std::move(serv), m_ext->m_manageid));
 	}
@@ -537,6 +541,13 @@ NetworkPacket::NetworkPacket(uint8_t cmd, networkpacket_cmd_tag_t) :
 	(*this) << cmd;
 }
 
+NetworkPacket NetworkPacket::copyReset()
+{
+	NetworkPacket packet(m_data.data(), m_data.size(), networkpacket_buf_len_tag_t());
+	packet.m_off = 0;
+	return packet;
+}
+
 uint8_t * NetworkPacket::getDataPtr()
 {
 	return m_data.data();
@@ -580,7 +591,7 @@ void NetworkPacket::rewriteU16At(size_t off, uint16_t i, uint16_t *opt_old_val)
 
 uint8_t NetworkPacket::readU8(const uint8_t *data)
 {
-	return (m_data[0] << 0);
+	return (data[0] << 0);
 }
 
 void NetworkPacket::writeU8(uint8_t *data, uint8_t i)
