@@ -8,6 +8,10 @@
 
 #include <enet/enet.h>  // FIXME: including enet just for the WIN/NIX socket definitions
 
+#ifndef _WIN32
+#  include <arpa/inet.h>  // ntohl etc
+#endif
+
 #define VSERV_ADDRESS_ADDR_SIZE 16
 
 struct address_ipv4_tag_t {};

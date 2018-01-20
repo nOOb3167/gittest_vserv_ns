@@ -21,13 +21,23 @@
 #define VSERV_NETWORKPACKET_SIZE_INCREMENT 4096
 #define VSERV_UDPSIZE_MAX 4096
 
-#define VSERV_WORK_CLIENT_MAX 128
-#define VSERV_MGMT_CLIENT_MAX 128
+#define VSERV_WORK_CLIENT_MAX  128
+#define VSERV_MGMT_CLIENT_MAX  128
+#define VSERV_BOTH_CLIENT_CEIL 128
+
+#define VSERV_USER_TIMEOUT_CHECK_MS 1000
+#define VSERV_USER_TIMEOUT_MS 5000
 
 class VServMgmt;
 
 struct networkpacket_buf_len_tag_t {};
 struct networkpacket_cmd_tag_t {};
+
+class ProtocolExc : public std::runtime_error
+{
+public:
+	ProtocolExc(const char *msg);
+};
 
 class NetworkPacket
 {
@@ -44,6 +54,7 @@ public:
 
 	uint8_t * getDataPtr();
 	size_t getDataSize();
+	size_t getRemainingSize();
 
 	uint8_t readU8(const uint8_t *data);
 	void writeU8(uint8_t *data, uint8_t i);
@@ -56,6 +67,11 @@ public:
 
 	void checkReadOffset(uint32_t from_offset, uint32_t field_size);
 	void checkDataSize(uint32_t field_size);
+
+	const char * inSizedStr(size_t len);
+	void outSizedStr(const char *str, size_t len);
+
+	void rewriteU16At(size_t off, uint16_t i, uint16_t *opt_old_val);
 
 	NetworkPacket& operator>>(uint8_t& dst);
 	NetworkPacket& operator<<(uint8_t src);
@@ -75,6 +91,8 @@ class VServRespond
 {
 public:
 	void respondOneshot(NetworkPacket packet, Address addr);
+	void respondMulti(NetworkPacket packet, Address *addr_vec, size_t addr_num);
+	void respondMultiId(NetworkPacket packet, uint16_t *id_vec, size_t id_num, const std::map<uint16_t, Address> &uid_addr_map);
 
 protected:
 	virtual void virtualRespond(NetworkPacket packet, Address *addr_vec, size_t addr_num) = 0;
@@ -166,12 +184,13 @@ private:
 class VServCtl
 {
 public:
-	VServCtl(std::unique_ptr<VServMgmt> mgmt);
+	VServCtl(std::unique_ptr<VServWork> work, std::unique_ptr<VServMgmt> mgmt);
 
 private:
+	std::unique_ptr<VServWork> m_work;
 	std::unique_ptr<VServMgmt> m_mgmt;
 };
 
-void vserv_start_crank(size_t port);
+void vserv_start_crank(size_t port_work, size_t port_mgmt);
 
 #endif /* _NS_VSERV_NET_MAIN_H_ */
