@@ -28,8 +28,6 @@
 #define VSERV_USER_TIMEOUT_CHECK_MS 1000
 #define VSERV_USER_TIMEOUT_MS 5000
 
-class VServMgmt;
-
 struct networkpacket_buf_len_tag_t {};
 struct networkpacket_cmd_tag_t {};
 
@@ -115,6 +113,9 @@ public:
 	VServWork(size_t port);
 
 	void funcThread();
+	void funcThread2();
+
+	void join();
 
 protected:
 	virtual void virtualProcessPacket(NetworkPacket *packet, VServRespond *respond, Address addr) = 0;
@@ -123,6 +124,7 @@ private:
 	Address m_addr;
 	std::unique_ptr<UDPSocket>   m_sock;
 	std::unique_ptr<std::thread> m_thread;
+	std::exception_ptr           m_thread_exc;
 
 	std::shared_ptr<std::deque<VServWork::Write> > m_writequeue;
 };
@@ -148,6 +150,9 @@ public:
 	VServMgmt(size_t port);
 
 	void funcThread();
+	void funcThread2();
+
+	void join();
 
 	static ENetEvent * createEmptyENetEvent();
 
@@ -161,6 +166,7 @@ private:
 	ENetAddress  m_addr;
 	unique_ptr_enethost m_host;
 	std::unique_ptr<std::thread> m_thread;
+	std::exception_ptr           m_thread_exc;
 
 	std::shared_ptr<std::map<Address, ENetPeer *, address_less_t> > m_addr_peer_map;
 };
@@ -185,6 +191,8 @@ class VServCtl
 {
 public:
 	VServCtl(std::unique_ptr<VServWork> work, std::unique_ptr<VServMgmt> mgmt);
+
+	void join();
 
 private:
 	std::unique_ptr<VServWork> m_work;

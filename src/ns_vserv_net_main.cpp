@@ -766,6 +766,7 @@ VServWork::VServWork(size_t port) :
 	m_addr(AF_INET, (uint16_t)port, 0, address_ipv4_tag_t()),
 	m_sock(new UDPSocket()),
 	m_thread(),
+	m_thread_exc(),
 	m_writequeue(new std::deque<VServWork::Write>())
 {
 	m_sock->Bind(m_addr);
@@ -773,6 +774,16 @@ VServWork::VServWork(size_t port) :
 }
 
 void VServWork::funcThread()
+{
+	try {
+		funcThread2();
+	}
+	catch (std::exception &) {
+		m_thread_exc = std::current_exception();
+	}
+}
+
+void VServWork::funcThread2()
 {
 	const size_t timeout_generation_max = 4; /* [0,4] interval */
 	uint32_t timeout_generation_vec[] = { 1,  5,  10, 20,  500 };
@@ -810,6 +821,13 @@ void VServWork::funcThread()
 	}
 }
 
+void VServWork::join()
+{
+	m_thread->join();
+	if (m_thread_exc)
+		std::rethrow_exception(m_thread_exc);
+}
+
 VServRespondWork::VServRespondWork(const std::shared_ptr<std::deque<VServWork::Write> > & writequeue) :
 	m_writequeue(writequeue)
 {}
@@ -831,6 +849,16 @@ VServMgmt::VServMgmt(size_t port) :
 }
 
 void VServMgmt::funcThread()
+{
+	try {
+		funcThread2();
+	}
+	catch (std::exception &) {
+		m_thread_exc = std::current_exception();
+	}
+}
+
+void VServMgmt::funcThread2()
 {
 	const size_t timeout_generation_max = 4; /* [0,4] interval */
 	uint32_t timeout_generation_vec[] = { 1,  5,  10, 20,  500 };
@@ -892,6 +920,13 @@ void VServMgmt::funcThread()
 	}
 }
 
+void VServMgmt::join()
+{
+	m_thread->join();
+	if (m_thread_exc)
+		std::rethrow_exception(m_thread_exc);
+}
+
 ENetEvent * VServMgmt::createEmptyENetEvent()
 {
 	ENetEvent *evt = new ENetEvent();
@@ -916,12 +951,19 @@ VServCtl::VServCtl(std::unique_ptr<VServWork> work, std::unique_ptr<VServMgmt> m
 	m_mgmt(std::move(mgmt))
 {}
 
+void VServCtl::join()
+{
+	m_work->join();
+	m_mgmt->join();
+}
+
 void vserv_start_crank(size_t port_work, size_t port_mgmt)
 {
 	std::shared_ptr<VServConExt> ext(new VServConExt());
 	std::unique_ptr<VServWork0> work(new VServWork0(port_work, ext));
 	std::unique_ptr<VServMgmt0> mgmt(new VServMgmt0(port_mgmt, ext));
 	std::unique_ptr<VServCtl> ctl(new VServCtl(std::move(work), std::move(mgmt)));
+	ctl->join();
 }
 
 int main(int argc, char **argv)
